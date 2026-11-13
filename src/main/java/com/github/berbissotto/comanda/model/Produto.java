@@ -22,6 +22,7 @@ public class Produto {
     private Long id;
     private String nome;
     private String descricao;
+    private String categoria;
     private int quantidade;
     private double preco;
 
@@ -35,6 +36,7 @@ public class Produto {
                 ", nome='" + nome + '\'' +
                 ", quantidade=" + quantidade +
                 ", descricao='" + descricao + '\'' +
+                ", categoria='" + categoria + '\'' +
                 ", preco=" + preco + '\'' +
                 ", imagem= "+ imagens.size() + '\'' +
                 '}';
@@ -86,5 +88,13 @@ public class Produto {
 
     public void setImagens(List<Imagem> imagens) {
         this.imagens = imagens;
+    }
+
+    public String getCategoria() {
+        return categoria;
+    }
+
+    public void setCategoria(String categoria) {
+        this.categoria = categoria;
     }
 }
