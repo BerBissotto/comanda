@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Entrar')}"></head>
+<body>
+<main class="login-wrap">
+    <section class="card login-card" aria-labelledby="titulo">
+        <h1 id="titulo">Entrar</h1>
+        <p class="muted">Acesse com seu e-mail e senha.</p>
+
+        <div class="alert alert--erro" role="alert" th:if="${param.error}">
+            <strong>E-mail ou senha incorretos.</strong> Confira os dados e tente novamente.
+        </div>
+        <div class="alert alert--ok" role="status" th:if="${param.logout}">
+            Você saiu do sistema.
+        </div>
+
+        <form th:action="@{/login}" method="post">
+            <div class="field">
+                <label class="label" for="username">E-mail</label>
+                <input class="input" id="username" name="username" type="email" autocomplete="username"
+                       placeholder="voce@empresa.com" required autofocus>
+            </div>
+            <div class="field">
+                <label class="label" for="password">Senha</label>
+                <input class="input" id="password" name="password" type="password" autocomplete="current-password"
+                       placeholder="Sua senha" required>
+            </div>
+            <button class="btn btn-primary btn-block" type="submit">Entrar</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>

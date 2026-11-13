@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Produtos')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: topbar('produtos')}"></header>
+
+<main class="container">
+    <div class="page-head">
+        <div>
+            <h1 class="page-title">Produtos</h1>
+            <p class="muted">Toque em um produto para ver os detalhes e adicioná-lo à comanda.</p>
+        </div>
+        <a class="btn btn-ghost" th:href="@{/produtos/form}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            Novo produto
+        </a>
+    </div>
+
+    <div class="empty" th:if="${produtos.empty}">
+        <p>Nenhum produto cadastrado ainda.</p>
+        <a class="btn btn-primary" th:href="@{/produtos/form}">Cadastrar o primeiro produto</a>
+    </div>
+
+    <ul class="produtos-grid" id="produtos-grid" th:unless="${produtos.empty}">
+        <li class="produto-card" th:each="p : ${produtos.content}"
+            th:data-id="${p.id}"
+            th:data-nome="${p.nome}"
+            th:data-preco="${#numbers.formatDecimal(p.preco, 1, 'NONE', 2, 'POINT')}"
+            th:data-foto="${p.foto != null} ? @{/produtos/{id}/foto(id=${p.id})} : ''">
+
+            <button type="button" class="produto-card__toggle" aria-expanded="false"
+                    th:aria-controls="${'detalhe-' + p.id}">
+                <span class="produto-card__media">
+                    <img th:if="${p.foto != null}" th:src="@{/produtos/{id}/foto(id=${p.id})}" alt="" loading="lazy">
+                    <svg th:unless="${p.foto != null}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="m21 16-5-5-8 8"/></svg>
+                </span>
+                <span class="badge badge--accent produto-card__badge" data-selo hidden></span>
+                <span class="produto-card__info">
+                    <span class="produto-card__nome" th:text="${p.nome}">Nome do produto</span>
+                    <span class="produto-card__preco"
+                          th:text="${'R$ ' + #numbers.formatDecimal(p.preco, 1, 'POINT', 2, 'COMMA')}">R$ 0,00</span>
+                </span>
+            </button>
+
+            <div class="produto-card__detalhe" th:id="${'detalhe-' + p.id}" hidden>
+                <button type="button" class="btn-icon produto-card__fechar" data-acao="fechar" aria-label="Fechar detalhes">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+                </button>
+
+                <p class="produto-card__descricao"
+                   th:text="${#strings.isEmpty(p.descricao)} ? 'Sem descrição.' : ${p.descricao}">Descrição</p>
+
+                <div>
+                    <span class="label" th:id="${'qtd-label-' + p.id}">Quantidade</span>
+                    <div class="stepper" role="group" th:aria-labelledby="${'qtd-label-' + p.id}" style="margin-top: 8px">
+                        <button type="button" data-acao="menos" aria-label="Diminuir quantidade" disabled>−</button>
+                        <input type="number" inputmode="numeric" min="1" max="999" value="1" data-qtd aria-label="Quantidade">
+                        <button type="button" data-acao="mais" aria-label="Aumentar quantidade">+</button>
+                    </div>
+                </div>
+
+                <div class="produto-card__acoes">
+                    <button type="button" class="btn btn-primary" data-acao="adicionar">Adicionar à comanda</button>
+                    <button type="button" class="btn btn-danger" data-acao="remover" hidden>Remover da comanda</button>
+                </div>
+            </div>
+        </li>
+    </ul>
+
+    <nav class="paginacao" aria-label="Paginação de produtos" th:if="${produtos.totalPages > 1}">
+        <a class="paginacao__item" th:if="${produtos.hasPrevious()}"
+           th:href="@{/produtos(pagina=${produtos.number - 1})}" aria-label="Página anterior">‹ Anterior</a>
+        <span class="paginacao__item is-disabled" th:unless="${produtos.hasPrevious()}" aria-hidden="true">‹ Anterior</span>
+
+        <th:block th:each="n : ${paginas}">
+            <span class="paginacao__reticencias" th:if="${n == -1}" aria-hidden="true">…</span>
+            <a class="paginacao__item" th:if="${n != -1 and n != produtos.number}"
+               th:href="@{/produtos(pagina=${n})}" th:text="${n + 1}" th:aria-label="${'Página ' + (n + 1)}">1</a>
+            <span class="paginacao__item is-active" th:if="${n == produtos.number}"
+                  th:text="${n + 1}" aria-current="page">1</span>
+        </th:block>
+
+        <a class="paginacao__item" th:if="${produtos.hasNext()}"
+           th:href="@{/produtos(pagina=${produtos.number + 1})}" aria-label="Próxima página">Próxima ›</a>
+        <span class="paginacao__item is-disabled" th:unless="${produtos.hasNext()}" aria-hidden="true">Próxima ›</span>
+
+        <p class="muted paginacao__resumo"
+           th:text="${'Mostrando ' + (produtos.number * produtos.size + 1) + '–' + (produtos.number * produtos.size + produtos.numberOfElements) + ' de ' + produtos.totalElements + ' produtos'}"></p>
+    </nav>
+</main>
+
+<div class="comanda-bar" data-comanda-bar hidden>
+    <div class="comanda-bar__resumo">
+        <span class="muted" data-bar-itens>0 itens</span>
+        <span class="comanda-bar__total" data-bar-total>R$ 0,00</span>
+    </div>
+    <a class="btn btn-primary" th:href="@{/comanda}">Ver comanda</a>
+</div>
+
+<p class="visually-hidden" id="aviso-status" role="status" aria-live="polite"></p>
+
+<script th:src="@{/js/lista.js}" defer></script>
+</body>
+</html>
