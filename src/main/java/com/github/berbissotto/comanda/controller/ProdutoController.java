@@ -5,6 +5,9 @@ import com.github.berbissotto.comanda.dto.ProdutoResponse;
 import com.github.berbissotto.comanda.model.Produto;
 import com.github.berbissotto.comanda.service.ProdutoService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -14,10 +17,14 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 @Controller
 @RequestMapping("/produtos")
 public class ProdutoController {
+
+    private static final int TAMANHO_PAGINA = 10;
 
     @Autowired
     private ProdutoService produtoService;
@@ -29,9 +36,33 @@ public class ProdutoController {
     }
 
     @GetMapping
-    public String listaProdutos(Model model) {
-        model.addAttribute("produtos", produtoService.listarProdutos());
+    public String listaProdutos(@RequestParam(name = "pagina", defaultValue = "0") int pagina, Model model) {
+        Page<Produto> produtos = produtoService.listarProdutos(
+                PageRequest.of(Math.max(pagina, 0), TAMANHO_PAGINA, Sort.by("nome").ascending()));
+
+        // Pediu uma página além da última (ex.: após excluir produtos): volta para a última
+        if (produtos.getTotalPages() > 0 && pagina >= produtos.getTotalPages()) {
+            return "redirect:/produtos?pagina=" + (produtos.getTotalPages() - 1);
+        }
+
+        model.addAttribute("produtos", produtos);
+        model.addAttribute("paginas", janelaDePaginas(produtos.getNumber(), produtos.getTotalPages()));
         return "produto/lista";
+    }
+
+    // Números de página a exibir; -1 vira reticências ("1 … 4 5 6 … 12")
+    private List<Integer> janelaDePaginas(int atual, int total) {
+        List<Integer> paginas = new ArrayList<>();
+        int ultimo = total - 1;
+        for (int i = 0; i <= ultimo; i++) {
+            boolean perto = Math.abs(i - atual) <= 1;
+            if (i == 0 || i == ultimo || perto) {
+                paginas.add(i);
+            } else if (paginas.isEmpty() || paginas.get(paginas.size() - 1) != -1) {
+                paginas.add(-1);
+            }
+        }
+        return paginas;
     }
 
     @GetMapping("/{id}")

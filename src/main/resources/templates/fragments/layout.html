@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<!-- Fragmentos compartilhados: <head> e barra superior -->
+<head th:fragment="head(titulo)">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${titulo} + ' · Comanda'">Comanda</title>
+    <meta name="_csrf" th:if="${_csrf != null}" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:if="${_csrf != null}" th:content="${_csrf.headerName}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Nunito:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/dwerp.css}">
+    <script th:src="@{/js/comanda-store.js}" defer></script>
+</head>
+<body>
+<header class="app-header" th:fragment="topbar(ativo)">
+    <div class="app-header__inner">
+        <a class="brand" th:href="@{/produtos}">Comanda</a>
+
+        <a class="nav-link" th:href="@{/produtos}" th:classappend="${ativo == 'produtos'} ? 'is-active'">Produtos</a>
+        <a class="nav-link" th:href="@{/comanda}" th:classappend="${ativo == 'comanda'} ? 'is-active'">
+            Comanda <span class="badge badge--accent" data-comanda-count aria-label="itens na comanda">0</span>
+        </a>
+
+        <form th:action="@{/logout}" method="post" data-logout>
+            <button type="submit" class="nav-link">Sair</button>
+        </form>
+    </div>
+</header>
+</body>
+</html>

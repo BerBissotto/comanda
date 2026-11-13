@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Finalizar comanda')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: topbar('comanda')}"></header>
+
+<main class="container">
+    <div class="page-head">
+        <div>
+            <h1 class="page-title">Finalizar comanda</h1>
+            <p class="muted">Confira os itens, preencha os dados do cliente e finalize.</p>
+        </div>
+    </div>
+
+    <div id="mensagem" role="status" hidden></div>
+
+    <div class="final-grid">
+        <!-- Itens -->
+        <section class="card" aria-labelledby="titulo-itens">
+            <h2 class="card__title" id="titulo-itens">Itens</h2>
+
+            <div class="empty" id="itens-vazio" hidden>
+                <p>Nenhum item na comanda.</p>
+                <a class="btn btn-primary" th:href="@{/produtos}">Escolher produtos</a>
+            </div>
+
+            <ul class="itens" id="itens"></ul>
+
+            <div class="total-linha" id="bloco-total" hidden>
+                <div>
+                    <div class="label">Total</div>
+                    <div class="total-linha__qtd" id="qtd-total">0 itens</div>
+                </div>
+                <div class="total-linha__valor" id="valor-total">R$ 0,00</div>
+            </div>
+        </section>
+
+        <!-- Dados do cliente -->
+        <section class="card" aria-labelledby="titulo-cliente">
+            <h2 class="card__title" id="titulo-cliente">Dados da comanda</h2>
+
+            <form id="form-comanda" class="form-grid" autocomplete="off" onsubmit="return false">
+                <div class="field">
+                    <label class="label" for="mesa">Mesa <span class="opcional">(opcional)</span></label>
+                    <input class="input" id="mesa" name="mesa" type="text" maxlength="20" placeholder="Ex.: 12">
+                </div>
+
+                <div class="field">
+                    <label class="label" for="telefone">Telefone</label>
+                    <input class="input" id="telefone" name="telefone" type="tel" inputmode="tel" maxlength="16"
+                           placeholder="(00) 00000-0000" autocomplete="off" required>
+                </div>
+
+                <div class="field field--full combo">
+                    <label class="label" for="cliente">Cliente</label>
+                    <input class="input" id="cliente" name="cliente" type="text" maxlength="120"
+                           placeholder="Digite o nome para buscar um cliente já cadastrado" required
+                           role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="cliente-lista">
+                    <ul class="combo__lista" id="cliente-lista" role="listbox" aria-label="Clientes encontrados" hidden></ul>
+                </div>
+
+                <div class="field field--full">
+                    <label class="label" for="endereco">Endereço</label>
+                    <input class="input" id="endereco" name="endereco" type="text" maxlength="255"
+                           placeholder="Rua, número, bairro" required>
+                </div>
+
+                <div class="field field--full">
+                    <label class="label" for="observacoes">Observações <span class="opcional">(forma de pagamento, recados…)</span></label>
+                    <textarea class="input" id="observacoes" name="observacoes" maxlength="500"
+                              placeholder="Ex.: pagamento no Pix; sem cebola no item 2"></textarea>
+                </div>
+            </form>
+        </section>
+    </div>
+
+    <!-- fora do <form> para continuarem ativos depois de a comanda ser salva -->
+    <div class="acoes-final">
+        <button type="button" class="btn btn-ghost btn-voltar" id="btn-voltar" th:data-href="@{/produtos}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+            Voltar<span class="hide-sm">&nbsp;e editar itens</span>
+        </button>
+        <button type="button" class="btn btn-ghost" id="btn-pdf" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
+            Imprimir em PDF
+        </button>
+        <button type="button" class="btn btn-primary" id="btn-imprimir" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9V4h10v5M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><path d="M7 14h10v6H7z"/></svg>
+            Finalizar e imprimir
+        </button>
+    </div>
+</main>
+
+<!-- Conteúdo que vai para o papel (só aparece na impressão) -->
+<section class="recibo" id="recibo" aria-hidden="true"></section>
+
+<script th:src="@{/js/finalizar.js}" defer></script>
+</body>
+</html>
