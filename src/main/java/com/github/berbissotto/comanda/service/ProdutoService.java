@@ -44,9 +44,6 @@ public class ProdutoService {
         return produtoRepository.findAll(pageable);
     }
 
-    //Conferir essa porra
-    public Produto salvarProduto(Produto produto) {return produtoRepository.save(produto);}
-
     public void deletar(Long id){
         produtoRepository.deleteById(id);
     }
@@ -58,7 +55,11 @@ public class ProdutoService {
             produto.setQuantidade(novoProduto.getQuantidade());
             produto.setDescricao(novoProduto.getDescricao());
             produto.setCategoria(novoProduto.getCategoria());
-            produto.setImagens(novoProduto.getImagens());
+            // só troca a foto se uma nova foi enviada
+            if (novoProduto.getFoto() != null) {
+                produto.setFoto(novoProduto.getFoto());
+                produto.setFotoTipo(novoProduto.getFotoTipo());
+            }
             return produtoRepository.save(produto);
         }).orElseGet(()->{
             novoProduto.setId(id);
