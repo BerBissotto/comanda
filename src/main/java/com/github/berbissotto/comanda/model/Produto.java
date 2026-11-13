@@ -4,10 +4,10 @@ package com.github.berbissotto.comanda.model;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.Generated;
 import lombok.NoArgsConstructor;
 
 import java.util.ArrayList;
+import java.util.List;
 
 
 @Entity
@@ -15,7 +15,7 @@ import java.util.ArrayList;
 
 @NoArgsConstructor
 @AllArgsConstructor
-public class Produtos {
+public class Produto {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
