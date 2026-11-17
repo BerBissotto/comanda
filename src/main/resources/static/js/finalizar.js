@@ -17,6 +17,9 @@
   var btnVoltar = document.getElementById('btn-voltar');
   var recibo = document.getElementById('recibo');
 
+  // Envio é feito por fetch; evita o submit nativo (antes era onsubmit inline, bloqueado pela CSP)
+  form.addEventListener('submit', function (e) { e.preventDefault(); });
+
   var estado = {
     itens: C.itens(),     // cópia usada na tela; depois de finalizar fica congelada
     comanda: null,        // resposta do servidor depois de salvar

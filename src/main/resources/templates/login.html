@@ -10,6 +10,9 @@
         <div class="alert alert--erro" role="alert" th:if="${param.error}">
             <strong>E-mail ou senha incorretos.</strong> Confira os dados e tente novamente.
         </div>
+        <div class="alert alert--erro" role="alert" th:if="${param.bloqueado}">
+            <strong>Muitas tentativas de login.</strong> Por segurança, o acesso foi bloqueado temporariamente. Tente novamente em alguns minutos.
+        </div>
         <div class="alert alert--ok" role="status" th:if="${param.logout}">
             Você saiu do sistema.
         </div>

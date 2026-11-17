@@ -1,0 +1,654 @@
+diff --git a/.github/dependabot.yml b/.github/dependabot.yml
+new file mode 100644
+index 0000000..e001bc5
+--- /dev/null
++++ b/.github/dependabot.yml
+@@ -0,0 +1,12 @@
++# Verificação automática de dependências vulneráveis/desatualizadas (item 20)
++version: 2
++updates:
++  - package-ecosystem: "maven"
++    directory: "/"
++    schedule:
++      interval: "weekly"
++    open-pull-requests-limit: 5
++  - package-ecosystem: "github-actions"
++    directory: "/"
++    schedule:
++      interval: "monthly"
+diff --git a/.gitignore b/.gitignore
+index 667aaef..3d92370 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -31,3 +31,10 @@ build/
+ 
+ ### VS Code ###
+ .vscode/
++
++### Segredos ###
++.env
++.env.*
++*.pem
++*.key
++application-local.properties
+diff --git a/pom.xml b/pom.xml
+index dab18ab..8591b2a 100644
+--- a/pom.xml
++++ b/pom.xml
+@@ -45,6 +45,10 @@
+ 			<groupId>org.springframework.boot</groupId>
+ 			<artifactId>spring-boot-starter-thymeleaf</artifactId>
+ 		</dependency>
++		<dependency>
++			<groupId>org.springframework.boot</groupId>
++			<artifactId>spring-boot-starter-validation</artifactId>
++		</dependency>
+ 		<dependency>
+ 			<groupId>org.springframework.boot</groupId>
+ 			<artifactId>spring-boot-starter-webmvc</artifactId>
+diff --git a/src/main/java/com/github/berbissotto/comanda/config/LoginAttemptListener.java b/src/main/java/com/github/berbissotto/comanda/config/LoginAttemptListener.java
+new file mode 100644
+index 0000000..beda045
+--- /dev/null
++++ b/src/main/java/com/github/berbissotto/comanda/config/LoginAttemptListener.java
+@@ -0,0 +1,28 @@
++package com.github.berbissotto.comanda.config;
++
++import com.github.berbissotto.comanda.service.LoginAttemptService;
++import org.springframework.context.event.EventListener;
++import org.springframework.security.authentication.event.AuthenticationFailureBadCredentialsEvent;
++import org.springframework.security.authentication.event.AuthenticationSuccessEvent;
++import org.springframework.stereotype.Component;
++
++/** Alimenta o contador de tentativas com os eventos do Spring Security. */
++@Component
++public class LoginAttemptListener {
++
++    private final LoginAttemptService tentativas;
++
++    public LoginAttemptListener(LoginAttemptService tentativas) {
++        this.tentativas = tentativas;
++    }
++
++    @EventListener
++    public void aoFalhar(AuthenticationFailureBadCredentialsEvent evento) {
++        tentativas.registrarFalha(evento.getAuthentication().getName());
++    }
++
++    @EventListener
++    public void aoAutenticar(AuthenticationSuccessEvent evento) {
++        tentativas.registrarSucesso(evento.getAuthentication().getName());
++    }
++}
+diff --git a/src/main/java/com/github/berbissotto/comanda/config/SecurityConfig.java b/src/main/java/com/github/berbissotto/comanda/config/SecurityConfig.java
+index 21161b1..1e83403 100644
+--- a/src/main/java/com/github/berbissotto/comanda/config/SecurityConfig.java
++++ b/src/main/java/com/github/berbissotto/comanda/config/SecurityConfig.java
+@@ -9,7 +9,11 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+ import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+ import org.springframework.security.crypto.password.PasswordEncoder;
++import org.springframework.security.authentication.LockedException;
+ import org.springframework.security.web.SecurityFilterChain;
++import org.springframework.security.web.authentication.AuthenticationFailureHandler;
++import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
++import org.springframework.security.web.header.writers.StaticHeadersWriter;
+ 
+ @Configuration
+ @EnableWebSecurity
+@@ -24,13 +28,43 @@ public class SecurityConfig {
+                 .formLogin(form -> form
+                         .loginPage("/login")
+                         .defaultSuccessUrl("/produtos", true)
++                        .failureHandler(falhaDeLogin())
+                         .permitAll())
+                 .logout(logout -> logout
+                         .logoutSuccessUrl("/login?logout")
+-                        .permitAll());
++                        .permitAll())
++                .headers(headers -> headers
++                        .contentSecurityPolicy(csp -> csp.policyDirectives(CSP))
++                        .referrerPolicy(ref -> ref.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.SAME_ORIGIN))
++                        .addHeaderWriter(new StaticHeadersWriter("Permissions-Policy",
++                                "camera=(), microphone=(), geolocation=(), payment=()")));
++        // HSTS: o Spring Security já o envia (1 ano) nas respostas HTTPS
+         return http.build();
+     }
+ 
++    // Scripts só do próprio site. Estilos: 'unsafe-inline' porque a tela de impressão injeta
++    // um <style> com o tamanho da página e a lista usa um style="" pontual; fontes do Google Fonts.
++    private static final String CSP = String.join("; ",
++            "default-src 'self'",
++            "script-src 'self'",
++            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
++            "font-src 'self' https://fonts.gstatic.com",
++            "img-src 'self' data:",
++            "connect-src 'self'",
++            "object-src 'none'",
++            "base-uri 'self'",
++            "form-action 'self'",
++            "frame-ancestors 'none'");
++
++    // Diferencia "bloqueado por excesso de tentativas" de "senha errada" sem revelar se o e-mail existe
++    private AuthenticationFailureHandler falhaDeLogin() {
++        return (request, response, exception) -> {
++            boolean bloqueado = exception instanceof LockedException
++                    || exception.getCause() instanceof LockedException;
++            response.sendRedirect(request.getContextPath() + (bloqueado ? "/login?bloqueado" : "/login?error"));
++        };
++    }
++
+     @Bean
+     public PasswordEncoder passwordEncoder() {
+         return new BCryptPasswordEncoder();
+diff --git a/src/main/java/com/github/berbissotto/comanda/controller/ComandaController.java b/src/main/java/com/github/berbissotto/comanda/controller/ComandaController.java
+index 1f823f0..0a9aabb 100644
+--- a/src/main/java/com/github/berbissotto/comanda/controller/ComandaController.java
++++ b/src/main/java/com/github/berbissotto/comanda/controller/ComandaController.java
+@@ -5,7 +5,9 @@ import com.github.berbissotto.comanda.dto.ComandaCriada;
+ import com.github.berbissotto.comanda.dto.ComandaRequest;
+ import com.github.berbissotto.comanda.service.ComandaService;
+ import org.springframework.beans.factory.annotation.Autowired;
++import jakarta.validation.Valid;
+ import org.springframework.http.ResponseEntity;
++import org.springframework.web.bind.MethodArgumentNotValidException;
+ import org.springframework.stereotype.Controller;
+ import org.springframework.web.bind.annotation.*;
+ 
+@@ -26,7 +28,7 @@ public class ComandaController {
+ 
+     @PostMapping("/comandas")
+     @ResponseBody
+-    public ResponseEntity<ComandaCriada> criar(@RequestBody ComandaRequest request) {
++    public ResponseEntity<ComandaCriada> criar(@Valid @RequestBody ComandaRequest request) {
+         return ResponseEntity.ok(comandaService.finalizar(request));
+     }
+ 
+@@ -37,6 +39,14 @@ public class ComandaController {
+         return comandaService.buscarClientes(q).stream().map(ClienteResponse::from).toList();
+     }
+ 
++    @ExceptionHandler(MethodArgumentNotValidException.class)
++    public ResponseEntity<Map<String, String>> camposInvalidos(MethodArgumentNotValidException exception) {
++        String mensagem = exception.getBindingResult().getFieldErrors().stream()
++                .map(erro -> erro.getDefaultMessage())
++                .findFirst().orElse("Dados inválidos");
++        return ResponseEntity.badRequest().body(Map.of("erro", mensagem));
++    }
++
+     @ExceptionHandler(IllegalArgumentException.class)
+     public ResponseEntity<Map<String, String>> dadosInvalidos(IllegalArgumentException exception) {
+         return ResponseEntity.badRequest().body(Map.of("erro", exception.getMessage()));
+diff --git a/src/main/java/com/github/berbissotto/comanda/controller/ProdutoController.java b/src/main/java/com/github/berbissotto/comanda/controller/ProdutoController.java
+index a1450e0..0241181 100644
+--- a/src/main/java/com/github/berbissotto/comanda/controller/ProdutoController.java
++++ b/src/main/java/com/github/berbissotto/comanda/controller/ProdutoController.java
+@@ -8,6 +8,8 @@ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.data.domain.Page;
+ import org.springframework.data.domain.PageRequest;
+ import org.springframework.data.domain.Sort;
++import com.github.berbissotto.comanda.service.ImagemUpload;
++import jakarta.validation.Valid;
+ import org.springframework.http.MediaType;
+ import org.springframework.http.ResponseEntity;
+ import org.springframework.stereotype.Controller;
+@@ -73,24 +75,35 @@ public class ProdutoController {
+                 .orElse(ResponseEntity.notFound().build());
+     }
+ 
+-    // Devolve a foto do produto (usada em <img th:src="@{/produtos/{id}/foto(id=${p.id})}">)
++    // Devolve a foto do produto (usada em <img th:src="@{/produtos/{id}/foto(id=${p.id})}">).
++    // Só serve tipos da lista permitida (fotos antigas em SVG etc. deixam de ser servidas) e
++    // com CSP "sandbox" para que nada seja executado mesmo se aberta direto no navegador.
+     @GetMapping("/{id}/foto")
+     @ResponseBody
+     public ResponseEntity<byte[]> foto(@PathVariable Long id) {
+         return produtoService.buscarPorId(id)
+-                .filter(produto -> produto.getFoto() != null)
++                .filter(produto -> produto.getFoto() != null
++                        && ImagemUpload.TIPOS_PERMITIDOS.contains(produto.getFotoTipo()))
+                 .map(produto -> ResponseEntity.ok()
+                         .contentType(MediaType.parseMediaType(produto.getFotoTipo()))
++                        .header("Content-Security-Policy", "default-src 'none'; sandbox")
++                        .header("X-Content-Type-Options", "nosniff")
+                         .body(produto.getFoto()))
+                 .orElse(ResponseEntity.notFound().build());
+     }
+ 
+     @PostMapping("/novo")
+-    public String salvarProduto(@ModelAttribute("produto") ProdutoForm form,
++    public String salvarProduto(@Valid @ModelAttribute("produto") ProdutoForm form,
+                                 BindingResult result,
+                                 @RequestParam(value = "foto", required = false) MultipartFile arquivo,
+                                 Model model) {
+         if (result.hasErrors()) {
++            String mensagem = result.getAllErrors().stream()
++                    .map(erro -> erro.getDefaultMessage())
++                    .findFirst().orElse("Dados inválidos");
++            // erro de conversão (ex.: texto no campo de preço) vem com mensagem técnica
++            model.addAttribute("erro", result.hasFieldErrors("preco") || result.hasFieldErrors("quantidade")
++                    ? "Confira o preço e a quantidade informados" : mensagem);
+             return "produto/form";
+         }
+ 
+@@ -113,11 +126,12 @@ public class ProdutoController {
+             produto.setPreco(form.getPreco());
+ 
+             if (arquivo != null && !arquivo.isEmpty()) {
+-                String tipo = arquivo.getContentType();
+-                if (tipo == null || !tipo.startsWith("image/")) {
+-                    throw new IllegalArgumentException("O arquivo enviado precisa ser uma imagem");
+-                }
+-                produto.setFoto(arquivo.getBytes());
++                byte[] bytes = arquivo.getBytes();
++                // O tipo vem do CONTEÚDO do arquivo, não do cabeçalho enviado pelo navegador
++                String tipo = ImagemUpload.detectarTipo(bytes)
++                        .orElseThrow(() -> new IllegalArgumentException(
++                                "A imagem precisa ser PNG, JPEG, WebP ou GIF"));
++                produto.setFoto(bytes);
+                 produto.setFotoTipo(tipo);
+             }
+ 
+diff --git a/src/main/java/com/github/berbissotto/comanda/dto/ComandaRequest.java b/src/main/java/com/github/berbissotto/comanda/dto/ComandaRequest.java
+index 1d62d63..95fd9f3 100644
+--- a/src/main/java/com/github/berbissotto/comanda/dto/ComandaRequest.java
++++ b/src/main/java/com/github/berbissotto/comanda/dto/ComandaRequest.java
+@@ -1,5 +1,10 @@
+ package com.github.berbissotto.comanda.dto;
+ 
++import jakarta.validation.Valid;
++import jakarta.validation.constraints.NotEmpty;
++import jakarta.validation.constraints.Pattern;
++import jakarta.validation.constraints.Size;
++
+ import java.util.List;
+ 
+ /**
+@@ -7,12 +12,14 @@ import java.util.List;
+  * busca cada produto pelo id e calcula o total.
+  */
+ public record ComandaRequest(
+-        String mesa,
+-        String cliente,
+-        String telefone,
+-        String endereco,
+-        String observacoes,
+-        List<Item> itens
++        @Size(max = 20, message = "A mesa pode ter no máximo 20 caracteres") String mesa,
++        @Size(max = 120, message = "O nome do cliente pode ter no máximo 120 caracteres") String cliente,
++        @Size(max = 20, message = "O telefone pode ter no máximo 20 caracteres")
++        @Pattern(regexp = "[0-9()+\\-\\s]*", message = "Telefone inválido") String telefone,
++        @Size(max = 255, message = "O endereço pode ter no máximo 255 caracteres") String endereco,
++        @Size(max = 500, message = "As observações podem ter no máximo 500 caracteres") String observacoes,
++        @NotEmpty(message = "A comanda não tem itens")
++        @Size(max = 200, message = "Itens demais na comanda") List<@Valid Item> itens
+ ) {
+     public record Item(Long produtoId, Integer quantidade) {
+     }
+diff --git a/src/main/java/com/github/berbissotto/comanda/dto/ProdutoForm.java b/src/main/java/com/github/berbissotto/comanda/dto/ProdutoForm.java
+index bf5aebc..3486a4a 100644
+--- a/src/main/java/com/github/berbissotto/comanda/dto/ProdutoForm.java
++++ b/src/main/java/com/github/berbissotto/comanda/dto/ProdutoForm.java
+@@ -1,14 +1,35 @@
+ package com.github.berbissotto.comanda.dto;
+ 
+ import com.github.berbissotto.comanda.model.Produto;
++import jakarta.validation.constraints.DecimalMax;
++import jakarta.validation.constraints.DecimalMin;
++import jakarta.validation.constraints.Max;
++import jakarta.validation.constraints.Min;
++import jakarta.validation.constraints.NotBlank;
++import jakarta.validation.constraints.NotNull;
++import jakarta.validation.constraints.Size;
+ 
+ public class ProdutoForm {
+ 
+     private Long id;
++    @NotBlank(message = "Informe o nome do produto")
++    @Size(max = 120, message = "O nome pode ter no máximo 120 caracteres")
+     private String nome;
++
++    @NotNull(message = "Informe uma quantidade válida")
++    @Min(value = 0, message = "Informe uma quantidade válida")
++    @Max(value = 1_000_000, message = "Quantidade acima do permitido")
+     private Integer quantidade;
++
++    @Size(max = 255, message = "A descrição pode ter no máximo 255 caracteres")
+     private String descricao;
++
++    @Size(max = 60, message = "A categoria pode ter no máximo 60 caracteres")
+     private String categoria;
++
++    @NotNull(message = "Informe um preço válido")
++    @DecimalMin(value = "0", message = "Informe um preço válido")
++    @DecimalMax(value = "1000000", message = "Preço acima do permitido")
+     private Double preco;
+ 
+     public static ProdutoForm from(Produto produto) {
+diff --git a/src/main/java/com/github/berbissotto/comanda/service/ImagemUpload.java b/src/main/java/com/github/berbissotto/comanda/service/ImagemUpload.java
+new file mode 100644
+index 0000000..fab4cf0
+--- /dev/null
++++ b/src/main/java/com/github/berbissotto/comanda/service/ImagemUpload.java
+@@ -0,0 +1,41 @@
++package com.github.berbissotto.comanda.service;
++
++import java.util.Optional;
++import java.util.Set;
++
++/**
++ * Valida imagens enviadas pelo conteúdo real (bytes iniciais), nunca pelo
++ * Content-Type informado pelo navegador. Só PNG, JPEG, WebP e GIF;
++ * SVG e outros formatos que podem carregar script são recusados.
++ */
++public final class ImagemUpload {
++
++    public static final Set<String> TIPOS_PERMITIDOS =
++            Set.of("image/png", "image/jpeg", "image/webp", "image/gif");
++
++    private ImagemUpload() {
++    }
++
++    /** Tipo detectado pelo conteúdo, ou vazio se não for uma imagem permitida. */
++    public static Optional<String> detectarTipo(byte[] b) {
++        if (b == null || b.length < 12) {
++            return Optional.empty();
++        }
++        if ((b[0] & 0xFF) == 0x89 && b[1] == 'P' && b[2] == 'N' && b[3] == 'G'
++                && b[4] == 0x0D && b[5] == 0x0A && b[6] == 0x1A && b[7] == 0x0A) {
++            return Optional.of("image/png");
++        }
++        if ((b[0] & 0xFF) == 0xFF && (b[1] & 0xFF) == 0xD8 && (b[2] & 0xFF) == 0xFF) {
++            return Optional.of("image/jpeg");
++        }
++        if (b[0] == 'G' && b[1] == 'I' && b[2] == 'F' && b[3] == '8'
++                && (b[4] == '7' || b[4] == '9') && b[5] == 'a') {
++            return Optional.of("image/gif");
++        }
++        if (b[0] == 'R' && b[1] == 'I' && b[2] == 'F' && b[3] == 'F'
++                && b[8] == 'W' && b[9] == 'E' && b[10] == 'B' && b[11] == 'P') {
++            return Optional.of("image/webp");
++        }
++        return Optional.empty();
++    }
++}
+diff --git a/src/main/java/com/github/berbissotto/comanda/service/LoginAttemptService.java b/src/main/java/com/github/berbissotto/comanda/service/LoginAttemptService.java
+new file mode 100644
+index 0000000..e1408d6
+--- /dev/null
++++ b/src/main/java/com/github/berbissotto/comanda/service/LoginAttemptService.java
+@@ -0,0 +1,79 @@
++package com.github.berbissotto.comanda.service;
++
++import org.springframework.beans.factory.annotation.Value;
++import org.springframework.stereotype.Service;
++
++import java.time.Clock;
++import java.time.Duration;
++import java.time.Instant;
++import java.util.Locale;
++import java.util.concurrent.ConcurrentHashMap;
++
++/**
++ * Limita tentativas de login erradas por e-mail (existente ou não, para não
++ * revelar quais e-mails estão cadastrados). Depois de {@code max-attempts}
++ * falhas seguidas o e-mail fica bloqueado por {@code lock-duration}.
++ * O estado fica em memória: reiniciar a aplicação zera os contadores.
++ */
++@Service
++public class LoginAttemptService {
++
++    private static final int LIMITE_DE_REGISTROS = 10_000;
++
++    private record Registro(int falhas, Instant bloqueadoAte, Instant ultimaFalha) {
++    }
++
++    private final ConcurrentHashMap<String, Registro> registros = new ConcurrentHashMap<>();
++    private final int maxTentativas;
++    private final Duration duracaoBloqueio;
++    private final Clock relogio;
++
++    @org.springframework.beans.factory.annotation.Autowired
++    public LoginAttemptService(
++            @Value("${app.security.login.max-attempts:5}") int maxTentativas,
++            @Value("${app.security.login.lock-duration:15m}") Duration duracaoBloqueio) {
++        this(maxTentativas, duracaoBloqueio, Clock.systemUTC());
++    }
++
++    LoginAttemptService(int maxTentativas, Duration duracaoBloqueio, Clock relogio) {
++        this.maxTentativas = Math.max(1, maxTentativas);
++        this.duracaoBloqueio = duracaoBloqueio;
++        this.relogio = relogio;
++    }
++
++    public void registrarFalha(String email) {
++        String chave = chave(email);
++        Instant agora = relogio.instant();
++        limparExpirados(agora);
++        registros.compute(chave, (k, atual) -> {
++            // falhas antigas (fora da janela de bloqueio) não contam
++            int falhas = (atual == null || atual.ultimaFalha().plus(duracaoBloqueio).isBefore(agora))
++                    ? 1 : atual.falhas() + 1;
++            Instant ate = falhas >= maxTentativas ? agora.plus(duracaoBloqueio) : null;
++            return new Registro(falhas, ate, agora);
++        });
++    }
++
++    public void registrarSucesso(String email) {
++        registros.remove(chave(email));
++    }
++
++    public boolean estaBloqueado(String email) {
++        Registro registro = registros.get(chave(email));
++        return registro != null
++                && registro.bloqueadoAte() != null
++                && registro.bloqueadoAte().isAfter(relogio.instant());
++    }
++
++    private void limparExpirados(Instant agora) {
++        if (registros.size() < LIMITE_DE_REGISTROS) {
++            return;
++        }
++        registros.entrySet().removeIf(e -> e.getValue().ultimaFalha().plus(duracaoBloqueio).isBefore(agora));
++    }
++
++    private String chave(String email) {
++        String limpo = email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
++        return limpo.length() > 254 ? limpo.substring(0, 254) : limpo;
++    }
++}
+diff --git a/src/main/java/com/github/berbissotto/comanda/service/UsuarioDetailsService.java b/src/main/java/com/github/berbissotto/comanda/service/UsuarioDetailsService.java
+index 120b2e5..e0c39fc 100644
+--- a/src/main/java/com/github/berbissotto/comanda/service/UsuarioDetailsService.java
++++ b/src/main/java/com/github/berbissotto/comanda/service/UsuarioDetailsService.java
+@@ -3,6 +3,7 @@ package com.github.berbissotto.comanda.service;
+ import com.github.berbissotto.comanda.model.Usuario;
+ import com.github.berbissotto.comanda.repository.UsuarioRepository;
+ import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.security.authentication.LockedException;
+ import org.springframework.security.core.userdetails.User;
+ import org.springframework.security.core.userdetails.UserDetails;
+ import org.springframework.security.core.userdetails.UserDetailsService;
+@@ -15,8 +16,15 @@ public class UsuarioDetailsService implements UserDetailsService {
+     @Autowired
+     private UsuarioRepository usuarioRepository;
+ 
++    @Autowired
++    private LoginAttemptService tentativas;
++
+     @Override
+     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
++        // Checa o bloqueio ANTES de consultar o banco: vale também para e-mails inexistentes
++        if (tentativas.estaBloqueado(email)) {
++            throw new LockedException("Muitas tentativas de login");
++        }
+         Usuario usuario = usuarioRepository.findByEmailIgnoreCase(email == null ? "" : email.trim())
+                 .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
+         return User.withUsername(usuario.getEmail())
+diff --git a/src/main/resources/application.properties b/src/main/resources/application.properties
+index 457a232..f96131a 100644
+--- a/src/main/resources/application.properties
++++ b/src/main/resources/application.properties
+@@ -5,11 +5,16 @@ server.port=8080
+ server.servlet.session.timeout=30m
+ server.servlet.session.cookie.http-only=true
+ server.servlet.session.cookie.same-site=lax
+-server.servlet.session.cookie.secure=${SESSION_COOKIE_SECURE:false}
++# Seguro por padrão. Em desenvolvimento local sem HTTPS: SESSION_COOKIE_SECURE=false
++server.servlet.session.cookie.secure=${SESSION_COOKIE_SECURE:true}
+ 
++# Credenciais do banco: SEM valor padrão (a aplicação não sobe sem elas).
++# Defina DB_USERNAME e DB_PASSWORD como variáveis de ambiente ou num arquivo .env
++# na raiz do projeto (ignorado pelo Git, veja .gitignore).
++spring.config.import=optional:file:./.env[.properties]
+ spring.datasource.url=${DB_URL:jdbc:postgresql://localhost:5432/Comanda}
+-spring.datasource.username=${DB_USERNAME:admin}
+-spring.datasource.password=${DB_PASSWORD:1526}
++spring.datasource.username=${DB_USERNAME}
++spring.datasource.password=${DB_PASSWORD}
+ 
+ spring.web.resources.static-locations=classpath:/static/
+ 
+diff --git a/src/main/resources/static/js/finalizar.js b/src/main/resources/static/js/finalizar.js
+index 2427c58..3f01481 100644
+--- a/src/main/resources/static/js/finalizar.js
++++ b/src/main/resources/static/js/finalizar.js
+@@ -17,6 +17,9 @@
+   var btnVoltar = document.getElementById('btn-voltar');
+   var recibo = document.getElementById('recibo');
+ 
++  // Envio é feito por fetch; evita o submit nativo (antes era onsubmit inline, bloqueado pela CSP)
++  form.addEventListener('submit', function (e) { e.preventDefault(); });
++
+   var estado = {
+     itens: C.itens(),     // cópia usada na tela; depois de finalizar fica congelada
+     comanda: null,        // resposta do servidor depois de salvar
+diff --git a/src/main/resources/templates/comanda/finalizar.html b/src/main/resources/templates/comanda/finalizar.html
+index 9af28f5..69cd565 100644
+--- a/src/main/resources/templates/comanda/finalizar.html
++++ b/src/main/resources/templates/comanda/finalizar.html
+@@ -39,7 +39,7 @@
+         <section class="card" aria-labelledby="titulo-cliente">
+             <h2 class="card__title" id="titulo-cliente">Dados da comanda</h2>
+ 
+-            <form id="form-comanda" class="form-grid" autocomplete="off" onsubmit="return false">
++            <form id="form-comanda" class="form-grid" autocomplete="off">
+                 <div class="field">
+                     <label class="label" for="mesa">Mesa <span class="opcional">(opcional)</span></label>
+                     <input class="input" id="mesa" name="mesa" type="text" maxlength="20" placeholder="Ex.: 12">
+diff --git a/src/main/resources/templates/login.html b/src/main/resources/templates/login.html
+index 45f7cc2..c0ac087 100644
+--- a/src/main/resources/templates/login.html
++++ b/src/main/resources/templates/login.html
+@@ -10,6 +10,9 @@
+         <div class="alert alert--erro" role="alert" th:if="${param.error}">
+             <strong>E-mail ou senha incorretos.</strong> Confira os dados e tente novamente.
+         </div>
++        <div class="alert alert--erro" role="alert" th:if="${param.bloqueado}">
++            <strong>Muitas tentativas de login.</strong> Por segurança, o acesso foi bloqueado temporariamente. Tente novamente em alguns minutos.
++        </div>
+         <div class="alert alert--ok" role="status" th:if="${param.logout}">
+             Você saiu do sistema.
+         </div>
+diff --git a/src/test/java/com/github/berbissotto/comanda/service/ImagemUploadTest.java b/src/test/java/com/github/berbissotto/comanda/service/ImagemUploadTest.java
+new file mode 100644
+index 0000000..07c651c
+--- /dev/null
++++ b/src/test/java/com/github/berbissotto/comanda/service/ImagemUploadTest.java
+@@ -0,0 +1,36 @@
++package com.github.berbissotto.comanda.service;
++
++import org.junit.jupiter.api.Test;
++
++import java.nio.charset.StandardCharsets;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertTrue;
++
++class ImagemUploadTest {
++
++    private static byte[] comPadding(byte[] inicio) {
++        byte[] b = new byte[32];
++        System.arraycopy(inicio, 0, b, 0, inicio.length);
++        return b;
++    }
++
++    @Test
++    void reconheceFormatosPermitidos() {
++        assertEquals("image/png", ImagemUpload.detectarTipo(comPadding(new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A})).orElseThrow());
++        assertEquals("image/jpeg", ImagemUpload.detectarTipo(comPadding(new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0})).orElseThrow());
++        assertEquals("image/gif", ImagemUpload.detectarTipo(comPadding("GIF89a".getBytes(StandardCharsets.US_ASCII))).orElseThrow());
++        byte[] webp = comPadding("RIFF".getBytes(StandardCharsets.US_ASCII));
++        System.arraycopy("WEBP".getBytes(StandardCharsets.US_ASCII), 0, webp, 8, 4);
++        assertEquals("image/webp", ImagemUpload.detectarTipo(webp).orElseThrow());
++    }
++
++    @Test
++    void recusaSvgHtmlEVazio() {
++        byte[] svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" onload=\"alert(1)\"></svg>".getBytes(StandardCharsets.UTF_8);
++        assertTrue(ImagemUpload.detectarTipo(svg).isEmpty());
++        assertTrue(ImagemUpload.detectarTipo("<html><script>1</script></html>".getBytes(StandardCharsets.UTF_8)).isEmpty());
++        assertTrue(ImagemUpload.detectarTipo(new byte[0]).isEmpty());
++        assertTrue(ImagemUpload.detectarTipo(null).isEmpty());
++    }
++}
+diff --git a/src/test/java/com/github/berbissotto/comanda/service/LoginAttemptServiceTest.java b/src/test/java/com/github/berbissotto/comanda/service/LoginAttemptServiceTest.java
+new file mode 100644
+index 0000000..05869fa
+--- /dev/null
++++ b/src/test/java/com/github/berbissotto/comanda/service/LoginAttemptServiceTest.java
+@@ -0,0 +1,54 @@
++package com.github.berbissotto.comanda.service;
++
++import org.junit.jupiter.api.Test;
++
++import java.time.Clock;
++import java.time.Duration;
++import java.time.Instant;
++import java.time.ZoneOffset;
++
++import static org.junit.jupiter.api.Assertions.assertFalse;
++import static org.junit.jupiter.api.Assertions.assertTrue;
++
++class LoginAttemptServiceTest {
++
++    private static class RelogioFalso extends Clock {
++        Instant agora = Instant.parse("2026-11-16T12:00:00Z");
++
++        @Override public java.time.ZoneId getZone() { return ZoneOffset.UTC; }
++        @Override public Clock withZone(java.time.ZoneId z) { return this; }
++        @Override public Instant instant() { return agora; }
++    }
++
++    @Test
++    void bloqueiaDepoisDoLimiteEDesbloqueiaAposOTempo() {
++        RelogioFalso relogio = new RelogioFalso();
++        LoginAttemptService s = new LoginAttemptService(3, Duration.ofMinutes(15), relogio);
++
++        s.registrarFalha("A@x.com");
++        s.registrarFalha("a@x.com");
++        assertFalse(s.estaBloqueado("a@x.com"));
++        s.registrarFalha(" a@x.com ");
++        assertTrue(s.estaBloqueado("A@X.COM"));
++        assertFalse(s.estaBloqueado("outro@x.com"));
++
++        relogio.agora = relogio.agora.plus(Duration.ofMinutes(16));
++        assertFalse(s.estaBloqueado("a@x.com"));
++    }
++
++    @Test
++    void sucessoZeraOContador() {
++        LoginAttemptService s = new LoginAttemptService(2, Duration.ofMinutes(15), new RelogioFalso());
++        s.registrarFalha("a@x.com");
++        s.registrarSucesso("a@x.com");
++        s.registrarFalha("a@x.com");
++        assertFalse(s.estaBloqueado("a@x.com"));
++    }
++
++    @Test
++    void emailInexistenteTambemBloqueia() {
++        LoginAttemptService s = new LoginAttemptService(1, Duration.ofMinutes(15), new RelogioFalso());
++        s.registrarFalha("naoexiste@x.com");
++        assertTrue(s.estaBloqueado("naoexiste@x.com"));
++    }
++}

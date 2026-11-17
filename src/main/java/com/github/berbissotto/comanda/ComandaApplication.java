@@ -11,3 +11,6 @@ public class ComandaApplication {
 	}
 
 }
+
+//Email:admin@comanda.local
+//Senha:CMv_YoOuTuNc

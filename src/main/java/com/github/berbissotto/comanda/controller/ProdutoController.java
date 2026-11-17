@@ -8,6 +8,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import com.github.berbissotto.comanda.service.ImagemUpload;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -73,24 +76,35 @@ public class ProdutoController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // Devolve a foto do produto (usada em <img th:src="@{/produtos/{id}/foto(id=${p.id})}">)
+    // Devolve a foto do produto (usada em <img th:src="@{/produtos/{id}/foto(id=${p.id})}">).
+    // Só serve tipos da lista permitida (fotos antigas em SVG etc. deixam de ser servidas) e
+    // com CSP "sandbox" para que nada seja executado mesmo se aberta direto no navegador.
     @GetMapping("/{id}/foto")
     @ResponseBody
     public ResponseEntity<byte[]> foto(@PathVariable Long id) {
         return produtoService.buscarPorId(id)
-                .filter(produto -> produto.getFoto() != null)
+                .filter(produto -> produto.getFoto() != null
+                        && ImagemUpload.TIPOS_PERMITIDOS.contains(produto.getFotoTipo()))
                 .map(produto -> ResponseEntity.ok()
                         .contentType(MediaType.parseMediaType(produto.getFotoTipo()))
+                        .header("Content-Security-Policy", "default-src 'none'; sandbox")
+                        .header("X-Content-Type-Options", "nosniff")
                         .body(produto.getFoto()))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping("/novo")
-    public String salvarProduto(@ModelAttribute("produto") ProdutoForm form,
+    public String salvarProduto(@Valid @ModelAttribute("produto") ProdutoForm form,
                                 BindingResult result,
                                 @RequestParam(value = "foto", required = false) MultipartFile arquivo,
                                 Model model) {
         if (result.hasErrors()) {
+            String mensagem = result.getAllErrors().stream()
+                    .map(erro -> erro.getDefaultMessage())
+                    .findFirst().orElse("Dados inválidos");
+            // erro de conversão (ex.: texto no campo de preço) vem com mensagem técnica
+            model.addAttribute("erro", result.hasFieldErrors("preco") || result.hasFieldErrors("quantidade")
+                    ? "Confira o preço e a quantidade informados" : mensagem);
             return "produto/form";
         }
 
@@ -113,11 +127,12 @@ public class ProdutoController {
             produto.setPreco(form.getPreco());
 
             if (arquivo != null && !arquivo.isEmpty()) {
-                String tipo = arquivo.getContentType();
-                if (tipo == null || !tipo.startsWith("image/")) {
-                    throw new IllegalArgumentException("O arquivo enviado precisa ser uma imagem");
-                }
-                produto.setFoto(arquivo.getBytes());
+                byte[] bytes = arquivo.getBytes();
+                // O tipo vem do CONTEÚDO do arquivo, não do cabeçalho enviado pelo navegador
+                String tipo = ImagemUpload.detectarTipo(bytes)
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                "A imagem precisa ser PNG, JPEG, WebP ou GIF"));
+                produto.setFoto(bytes);
                 produto.setFotoTipo(tipo);
             }
 

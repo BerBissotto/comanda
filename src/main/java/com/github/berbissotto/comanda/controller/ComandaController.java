@@ -5,7 +5,9 @@ import com.github.berbissotto.comanda.dto.ComandaCriada;
 import com.github.berbissotto.comanda.dto.ComandaRequest;
 import com.github.berbissotto.comanda.service.ComandaService;
 import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,7 +28,7 @@ public class ComandaController {
 
     @PostMapping("/comandas")
     @ResponseBody
-    public ResponseEntity<ComandaCriada> criar(@RequestBody ComandaRequest request) {
+    public ResponseEntity<ComandaCriada> criar(@Valid @RequestBody ComandaRequest request) {
         return ResponseEntity.ok(comandaService.finalizar(request));
     }
 
@@ -35,6 +37,14 @@ public class ComandaController {
     @ResponseBody
     public List<ClienteResponse> buscarClientes(@RequestParam(name = "q", defaultValue = "") String q) {
         return comandaService.buscarClientes(q).stream().map(ClienteResponse::from).toList();
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, String>> camposInvalidos(MethodArgumentNotValidException exception) {
+        String mensagem = exception.getBindingResult().getFieldErrors().stream()
+                .map(erro -> erro.getDefaultMessage())
+                .findFirst().orElse("Dados inválidos");
+        return ResponseEntity.badRequest().body(Map.of("erro", mensagem));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
