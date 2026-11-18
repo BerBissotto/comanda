@@ -11,12 +11,12 @@
 
   var LIMITE = 10 * 1024 * 1024; // mesmo limite do servidor (10MB)
   var textoVazio = preview.textContent.trim();
-  var urlAtual = null;
+  var leitor = null;
 
   function limpar() {
-    if (urlAtual) { URL.revokeObjectURL(urlAtual); urlAtual = null; }
+    if (leitor) { leitor.onload = leitor.onerror = null; leitor.abort(); leitor = null; }
     entrada.value = '';
-    preview.classList.remove('has-image');
+    preview.classList.remove('has-image', 'is-loading', 'is-ready');
     preview.textContent = textoVazio;
     nome.textContent = 'Nenhuma imagem escolhida';
     remover.hidden = true;
@@ -39,19 +39,36 @@
       limpar(); avisar('A imagem tem mais de 10 MB. Escolha uma menor.'); return;
     }
 
-    if (urlAtual) URL.revokeObjectURL(urlAtual);
-    urlAtual = URL.createObjectURL(arquivo);
+    // A CSP da página só aceita imagens do próprio site ou data:, então o preview vem de data URL
+    if (leitor) { leitor.onload = leitor.onerror = null; leitor.abort(); }
+    // esqueleto já durante a leitura do arquivo
+    preview.textContent = '';
+    preview.classList.remove('is-ready');
+    preview.classList.add('has-image', 'is-loading');
+    leitor = new FileReader();
+    leitor.onerror = function () { limpar(); avisar('Não foi possível ler essa imagem.'); };
+    leitor.onload = function () { mostrarPreview(arquivo, leitor.result); };
+    leitor.readAsDataURL(arquivo);
+  });
 
+  function mostrarPreview(arquivo, url) {
+    // esqueleto até a imagem ficar pronta; depois aparece com fade
     var img = document.createElement('img');
-    img.src = urlAtual;
     img.alt = 'Pré-visualização da imagem escolhida';
     preview.textContent = '';
+    preview.classList.remove('is-ready');
+    preview.classList.add('has-image', 'is-loading');
+    img.addEventListener('load', function () {
+      preview.classList.remove('is-loading');
+      preview.classList.add('is-ready');
+    });
+    img.addEventListener('error', function () { limpar(); avisar('Não foi possível ler essa imagem.'); });
     preview.appendChild(img);
-    preview.classList.add('has-image');
+    img.src = url;
 
     nome.textContent = arquivo.name;
     remover.hidden = false;
-  });
+  }
 
   remover.addEventListener('click', function () { limpar(); avisar(''); });
 })();

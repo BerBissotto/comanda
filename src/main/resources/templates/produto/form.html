@@ -19,7 +19,7 @@
     <form class="card" th:action="@{/produtos/novo}" th:object="${produto}" method="post" enctype="multipart/form-data">
         <div class="form-grid">
             <div class="field">
-                <label class="label" for="nome">Nome</label>
+                <label class="label" for="nome">Nome<span class="req" aria-hidden="true">*</span></label>
                 <input class="input" id="nome" th:field="*{nome}" type="text" maxlength="120"
                        placeholder="Ex.: X-Burger" required autofocus>
             </div>
@@ -31,13 +31,13 @@
             </div>
 
             <div class="field">
-                <label class="label" for="preco">Preço (R$)</label>
+                <label class="label" for="preco">Preço (R$)<span class="req" aria-hidden="true">*</span></label>
                 <input class="input" id="preco" th:field="*{preco}" type="number" inputmode="decimal"
                        min="0" step="0.01" placeholder="0,00" required>
             </div>
 
             <div class="field">
-                <label class="label" for="quantidade">Quantidade em estoque</label>
+                <label class="label" for="quantidade">Quantidade em estoque<span class="req" aria-hidden="true">*</span></label>
                 <input class="input" id="quantidade" th:field="*{quantidade}" type="number" inputmode="numeric"
                        min="0" step="1" placeholder="0" required>
             </div>

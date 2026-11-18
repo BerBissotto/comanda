@@ -22,16 +22,16 @@
     </div>
 
     <ul class="produtos-grid" id="produtos-grid" th:unless="${produtos.empty}">
-        <li class="produto-card" th:each="p : ${produtos.content}"
+        <li class="produto-card" th:each="p : ${produtos.content}" data-reveal
             th:data-id="${p.id}"
             th:data-nome="${p.nome}"
+            th:data-descricao="${p.descricao}"
             th:data-preco="${#numbers.formatDecimal(p.preco, 1, 'NONE', 2, 'POINT')}"
             th:data-foto="${p.foto != null} ? @{/produtos/{id}/foto(id=${p.id})} : ''">
 
-            <button type="button" class="produto-card__toggle" aria-expanded="false"
-                    th:aria-controls="${'detalhe-' + p.id}">
-                <span class="produto-card__media">
-                    <img th:if="${p.foto != null}" th:src="@{/produtos/{id}/foto(id=${p.id})}" alt="" loading="lazy">
+            <button type="button" class="produto-card__toggle" aria-haspopup="dialog">
+                <span class="produto-card__media media" th:classappend="${p.foto != null} ? 'has-img'">
+                    <img th:if="${p.foto != null}" th:src="@{/produtos/{id}/foto(id=${p.id})}" alt="" loading="lazy" decoding="async">
                     <svg th:unless="${p.foto != null}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="m21 16-5-5-8 8"/></svg>
                 </span>
                 <span class="badge badge--accent produto-card__badge" data-selo hidden></span>
@@ -41,29 +41,6 @@
                           th:text="${'R$ ' + #numbers.formatDecimal(p.preco, 1, 'POINT', 2, 'COMMA')}">R$ 0,00</span>
                 </span>
             </button>
-
-            <div class="produto-card__detalhe" th:id="${'detalhe-' + p.id}" hidden>
-                <button type="button" class="btn-icon produto-card__fechar" data-acao="fechar" aria-label="Fechar detalhes">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
-                </button>
-
-                <p class="produto-card__descricao"
-                   th:text="${#strings.isEmpty(p.descricao)} ? 'Sem descrição.' : ${p.descricao}">Descrição</p>
-
-                <div>
-                    <span class="label" th:id="${'qtd-label-' + p.id}">Quantidade</span>
-                    <div class="stepper" role="group" th:aria-labelledby="${'qtd-label-' + p.id}" style="margin-top: 8px">
-                        <button type="button" data-acao="menos" aria-label="Diminuir quantidade" disabled>−</button>
-                        <input type="number" inputmode="numeric" min="1" max="999" value="1" data-qtd aria-label="Quantidade">
-                        <button type="button" data-acao="mais" aria-label="Aumentar quantidade">+</button>
-                    </div>
-                </div>
-
-                <div class="produto-card__acoes">
-                    <button type="button" class="btn btn-primary" data-acao="adicionar">Adicionar à comanda</button>
-                    <button type="button" class="btn btn-danger" data-acao="remover" hidden>Remover da comanda</button>
-                </div>
-            </div>
         </li>
     </ul>
 
@@ -89,7 +66,52 @@
     </nav>
 </main>
 
-<div class="comanda-bar" data-comanda-bar hidden>
+<!--
+  Detalhe do produto: um único diálogo reaproveitado por todos os cards.
+  Fica por cima da lista (camada superior) e não desloca nenhum item.
+-->
+<dialog class="pdlg" id="produto-dialog" aria-labelledby="pdlg-nome" aria-describedby="pdlg-descricao">
+    <div class="pdlg__panel">
+        <button type="button" class="btn-icon pdlg__fechar" data-acao="fechar" aria-label="Fechar detalhes">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+
+        <div class="pdlg__media media" data-media>
+            <img alt="" data-foto hidden decoding="async">
+            <svg data-sem-foto viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="m21 16-5-5-8 8"/></svg>
+        </div>
+
+        <div class="pdlg__body">
+            <div class="pdlg__texto">
+                <h2 class="pdlg__nome" id="pdlg-nome" data-nome></h2>
+                <p class="pdlg__descricao" id="pdlg-descricao" data-descricao></p>
+                <p class="pdlg__preco" data-preco></p>
+            </div>
+
+            <div>
+                <span class="label" id="pdlg-qtd-label">Quantidade</span>
+                <div class="stepper" role="group" aria-labelledby="pdlg-qtd-label">
+                    <button type="button" data-acao="menos" aria-label="Diminuir quantidade" disabled>−</button>
+                    <input type="number" inputmode="numeric" min="1" max="999" value="1" data-qtd aria-label="Quantidade">
+                    <button type="button" data-acao="mais" aria-label="Aumentar quantidade">+</button>
+                </div>
+            </div>
+
+            <div class="pdlg__acoes">
+                <button type="button" class="btn btn-primary btn--swap" data-acao="adicionar">
+                    <span data-rotulo>Adicionar à comanda</span>
+                    <span data-ok aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+                        Adicionado
+                    </span>
+                </button>
+                <button type="button" class="btn btn-danger" data-acao="remover" hidden>Remover da comanda</button>
+            </div>
+        </div>
+    </div>
+</dialog>
+
+<div class="comanda-bar" data-comanda-bar inert>
     <div class="comanda-bar__resumo">
         <span class="muted" data-bar-itens>0 itens</span>
         <span class="comanda-bar__total" data-bar-total>R$ 0,00</span>

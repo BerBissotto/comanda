@@ -1,24 +1,59 @@
-/* Lista de produtos: card que expande, quantidade e adicionar/remover da comanda */
+/*
+ * Lista de produtos: o card selecionado abre num diálogo por cima da lista
+ * (sem deslocar os outros itens), com o fundo desfocado ao redor, e permite
+ * escolher a quantidade e adicionar/remover da comanda.
+ */
 (function () {
   'use strict';
 
+  var UI = window.UI || { reduzido: false };
   var grid = document.getElementById('produtos-grid');
   var barra = document.querySelector('[data-comanda-bar]');
   var aviso = document.getElementById('aviso-status');
+  var raiz = document.documentElement;
+
+  function anunciar(texto) {
+    if (aviso) { aviso.textContent = ''; setTimeout(function () { aviso.textContent = texto; }, 30); }
+  }
+
+  /* ---- barra fixa com o resumo da comanda (sobe e desce) ---- */
+  function atualizarBarra() {
+    if (!barra) return;
+    var t = window.Comanda.totais();
+    var visivel = t.unidades > 0;
+    barra.classList.toggle('is-visible', visivel);
+    barra.inert = !visivel;
+    document.body.classList.toggle('has-bar', visivel);
+    barra.querySelector('[data-bar-itens]').textContent =
+      t.unidades + (t.unidades === 1 ? ' item' : ' itens');
+    barra.querySelector('[data-bar-total]').textContent = window.Comanda.moeda(t.valor);
+  }
+
   if (!grid) {
     atualizarBarra();
     document.addEventListener('comanda:change', atualizarBarra);
     return;
   }
 
-  var reduzir = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var cards = Array.prototype.slice.call(grid.querySelectorAll('.produto-card'));
-  var aberto = null;
+  var dlg = document.getElementById('produto-dialog');
+  var painel = dlg.querySelector('.pdlg__panel');
+  var D = {
+    midia: dlg.querySelector('[data-media]'),
+    img: dlg.querySelector('[data-foto]'),
+    semFoto: dlg.querySelector('[data-sem-foto]'),
+    nome: dlg.querySelector('[data-nome]'),
+    descricao: dlg.querySelector('[data-descricao]'),
+    preco: dlg.querySelector('[data-preco]'),
+    campo: dlg.querySelector('[data-qtd]'),
+    menos: dlg.querySelector('[data-acao="menos"]'),
+    adicionar: dlg.querySelector('[data-acao="adicionar"]'),
+    remover: dlg.querySelector('[data-acao="remover"]')
+  };
 
-  // Nome único por card para o navegador animar a posição/tamanho de cada um
-  cards.forEach(function (card) {
-    card.style.viewTransitionName = 'card-' + card.dataset.id;
-  });
+  var cards = Array.prototype.slice.call(grid.querySelectorAll('.produto-card'));
+  var atual = null;          // card exibido no diálogo
+  var terminar = null;       // encerra o fechamento animado em andamento
+  var timerOk = null;
 
   function dados(card) {
     return {
@@ -29,130 +64,185 @@
     };
   }
 
-  function campoQtd(card) { return card.querySelector('[data-qtd]'); }
+  function lerQtd() { return window.Comanda.limitar(D.campo.value); }
 
-  function lerQtd(card) { return window.Comanda.limitar(campoQtd(card).value); }
-
-  function anunciar(texto) {
-    if (aviso) { aviso.textContent = ''; setTimeout(function () { aviso.textContent = texto; }, 30); }
-  }
-
-  /* ---- estado visual de um card conforme o que já está na comanda ---- */
+  /* ---- estado do selo no card da lista ---- */
   function atualizarCard(card) {
     var item = window.Comanda.item(card.dataset.id);
     var selo = card.querySelector('[data-selo]');
-    var btnAdd = card.querySelector('[data-acao="adicionar"]');
-    var btnRem = card.querySelector('[data-acao="remover"]');
+    var texto = item ? 'Na comanda · ' + item.quantidade : '';
+    var mudou = selo.textContent !== texto;
 
     selo.hidden = !item;
-    if (item) selo.textContent = 'Na comanda · ' + item.quantidade;
-
-    btnAdd.textContent = item ? 'Atualizar quantidade' : 'Adicionar à comanda';
-    btnRem.hidden = !item;
-
-    var campo = campoQtd(card);
-    if (item && document.activeElement !== campo) campo.value = item.quantidade;
-    card.querySelector('[data-acao="menos"]').disabled = lerQtd(card) <= 1;
+    selo.textContent = texto;
+    if (item && mudou && !UI.reduzido) {
+      selo.classList.remove('is-bump');
+      void selo.offsetWidth;
+      selo.classList.add('is-bump');
+    }
   }
 
-  function atualizarBarra() {
-    if (!barra) return;
-    var t = window.Comanda.totais();
-    barra.hidden = t.unidades === 0;
-    barra.querySelector('[data-bar-itens]').textContent =
-      t.unidades + (t.unidades === 1 ? ' item' : ' itens');
-    barra.querySelector('[data-bar-total]').textContent = window.Comanda.moeda(t.valor);
+  /* ---- estado dos botões do diálogo conforme o que já está na comanda ---- */
+  function atualizarDialog() {
+    if (!atual) return;
+    var item = window.Comanda.item(atual.dataset.id);
+    D.adicionar.querySelector('[data-rotulo]').textContent = item ? 'Atualizar quantidade' : 'Adicionar à comanda';
+    D.remover.hidden = !item;
+    if (item && document.activeElement !== D.campo) D.campo.value = item.quantidade;
+    D.menos.disabled = lerQtd() <= 1;
   }
 
   function atualizarTudo() {
     cards.forEach(atualizarCard);
+    atualizarDialog();
     atualizarBarra();
   }
 
-  /* ---- abrir / fechar com animação ---- */
-  function aplicar(card, abrir) {
-    if (aberto && aberto !== card) fecharAgora(aberto);
-    if (abrir) {
-      card.classList.add('is-open');
-      card.querySelector('.produto-card__toggle').setAttribute('aria-expanded', 'true');
-      card.querySelector('.produto-card__detalhe').hidden = false;
-      aberto = card;
+  /* ---- preencher o diálogo com os dados do card ---- */
+  function preencher(card) {
+    var d = dados(card);
+    D.nome.textContent = d.nome;
+    D.descricao.textContent = card.dataset.descricao ? card.dataset.descricao : 'Sem descrição.';
+    D.preco.textContent = window.Comanda.moeda(d.preco);
+
+    D.midia.classList.remove('is-loaded');
+    if (d.foto) {
+      D.midia.classList.add('has-img');
+      D.semFoto.hidden = true;
+      D.img.hidden = false;
+      D.img.src = d.foto;
+      if (D.img.complete && D.img.naturalWidth > 0) D.midia.classList.add('is-loaded');
     } else {
-      fecharAgora(card);
-      aberto = null;
+      D.midia.classList.remove('has-img');
+      D.img.hidden = true;
+      D.img.removeAttribute('src');
+      D.semFoto.hidden = false;
+    }
+
+    D.campo.value = 1;
+    D.adicionar.classList.remove('is-ok');
+    clearTimeout(timerOk);
+    atualizarDialog();
+  }
+
+  D.img.addEventListener('load', function () { D.midia.classList.add('is-loaded'); });
+  D.img.addEventListener('error', function () {
+    D.midia.classList.remove('has-img');
+    D.midia.classList.add('is-loaded');
+    D.img.hidden = true;
+    D.semFoto.hidden = false;
+  });
+
+  /* ---- abrir: cresce a partir do card clicado ---- */
+  function abrir(card, porTeclado) {
+    if (terminar) terminar();
+    if (atual) atual.classList.remove('is-selected');
+
+    atual = card;
+    atual.classList.add('is-selected');
+    preencher(card);
+
+    var animar = !UI.reduzido && !porTeclado;    // teclado nunca anima
+    dlg.classList.remove('is-visible', 'is-closing');
+    dlg.style.removeProperty('--from');
+    dlg.dataset.anim = animar ? 'on' : 'off';
+    raiz.classList.add('dlg-open');
+    dlg.showModal();
+
+    if (animar) {
+      // origem = centro do card clicado; só translate + scale uniforme (sem distorcer)
+      var c = card.getBoundingClientRect();
+      var p = dlg.getBoundingClientRect();
+      var dx = (c.left + c.width / 2) - (p.left + p.width / 2);
+      var dy = (c.top + c.height / 2) - (p.top + p.height / 2);
+      var s = Math.max(.4, Math.min(1, c.width / p.width));
+      dlg.style.setProperty('--from', 'translate(' + dx + 'px, ' + dy + 'px) scale(' + s + ')');
+      void painel.offsetWidth;                   // fixa o estado inicial antes de transicionar
+    }
+    dlg.classList.add('is-visible');
+  }
+
+  /* ---- fechar: mais curto e sutil que a abertura ---- */
+  function concluirFechamento() {
+    terminar = null;
+    dlg.classList.remove('is-visible', 'is-closing');
+    if (dlg.open) dlg.close();
+    raiz.classList.remove('dlg-open');
+    if (atual) {
+      atual.classList.remove('is-selected');
+      var gatilho = atual.querySelector('.produto-card__toggle');
+      atual = null;
+      if (gatilho) gatilho.focus({ preventScroll: true });
     }
   }
 
-  function fecharAgora(card) {
-    card.classList.remove('is-open');
-    card.querySelector('.produto-card__toggle').setAttribute('aria-expanded', 'false');
-    card.querySelector('.produto-card__detalhe').hidden = true;
-  }
+  function fechar(imediato) {
+    if (!atual || terminar) return;
+    if (imediato || UI.reduzido) { concluirFechamento(); return; }
 
-  function alternar(card) {
-    var abrir = aberto !== card;
-    var depois = function () {
-      if (abrir) card.scrollIntoView({ block: 'nearest', behavior: reduzir ? 'auto' : 'smooth' });
+    var feito = false;
+    var fim = function () {
+      if (feito) return;
+      feito = true;
+      painel.removeEventListener('transitionend', aoTransicionar);
+      concluirFechamento();
     };
-
-    if (document.startViewTransition && !reduzir) {
-      try {
-        document.startViewTransition(function () { aplicar(card, abrir); }).finished.then(depois, depois);
-        return;
-      } catch (e) { /* cai para a troca simples */ }
-    }
-    aplicar(card, abrir);
-    depois();
+    var aoTransicionar = function (e) {
+      if (e.target === painel && e.propertyName === 'opacity') fim();
+    };
+    terminar = fim;
+    painel.addEventListener('transitionend', aoTransicionar);
+    setTimeout(fim, 300);                        // garantia se o transitionend não vier
+    dlg.classList.remove('is-visible');
+    dlg.classList.add('is-closing');
   }
 
-  /* ---- eventos (delegação) ---- */
+  // Esc: ação de teclado, fecha na hora
+  dlg.addEventListener('cancel', function (e) { e.preventDefault(); fechar(true); });
+  // Clique no fundo desfocado (fora do painel)
+  dlg.addEventListener('click', function (e) { if (e.target === dlg) fechar(false); });
+  dlg.addEventListener('close', function () { raiz.classList.remove('dlg-open'); });
+
+  /* ---- eventos da lista ---- */
   grid.addEventListener('click', function (e) {
-    var card = e.target.closest('.produto-card');
-    if (!card) return;
+    var toggle = e.target.closest('.produto-card__toggle');
+    if (!toggle) return;
+    abrir(toggle.closest('.produto-card'), e.detail === 0);
+  });
 
+  /* ---- eventos do diálogo ---- */
+  dlg.addEventListener('click', function (e) {
     var alvo = e.target.closest('[data-acao]');
-    if (!alvo) {
-      if (e.target.closest('.produto-card__toggle')) alternar(card);
-      return;
-    }
-
+    if (!alvo || !atual) return;
     var acao = alvo.dataset.acao;
-    var campo = campoQtd(card);
 
-    if (acao === 'mais') { campo.value = window.Comanda.limitar(lerQtd(card) + 1); atualizarCard(card); }
-    if (acao === 'menos') { campo.value = window.Comanda.limitar(lerQtd(card) - 1); atualizarCard(card); }
-    if (acao === 'fechar') { alternar(card); card.querySelector('.produto-card__toggle').focus(); }
+    if (acao === 'mais') { D.campo.value = window.Comanda.limitar(lerQtd() + 1); atualizarDialog(); }
+    if (acao === 'menos') { D.campo.value = window.Comanda.limitar(lerQtd() - 1); atualizarDialog(); }
+    if (acao === 'fechar') fechar(e.detail === 0);
     if (acao === 'adicionar') {
-      window.Comanda.definir(dados(card), lerQtd(card));
-      anunciar(card.dataset.nome + ' na comanda: ' + lerQtd(card));
+      window.Comanda.definir(dados(atual), lerQtd());
+      anunciar(atual.dataset.nome + ' na comanda: ' + lerQtd());
+      D.adicionar.classList.add('is-ok');
+      clearTimeout(timerOk);
+      timerOk = setTimeout(function () { D.adicionar.classList.remove('is-ok'); }, 1400);
     }
     if (acao === 'remover') {
-      window.Comanda.remover(card.dataset.id);
-      campo.value = 1;
-      anunciar(card.dataset.nome + ' removido da comanda');
+      window.Comanda.remover(atual.dataset.id);
+      D.campo.value = 1;
+      anunciar(atual.dataset.nome + ' removido da comanda');
+      atualizarDialog();
     }
   });
 
-  grid.addEventListener('input', function (e) {
-    if (e.target.matches('[data-qtd]')) {
-      var card = e.target.closest('.produto-card');
-      card.querySelector('[data-acao="menos"]').disabled = window.Comanda.limitar(e.target.value) <= 1;
-    }
+  dlg.addEventListener('input', function (e) {
+    if (e.target.matches('[data-qtd]')) D.menos.disabled = window.Comanda.limitar(e.target.value) <= 1;
   });
 
   // Ao sair do campo, normaliza o valor digitado (vazio, 0, negativo...)
-  grid.addEventListener('change', function (e) {
+  dlg.addEventListener('change', function (e) {
     if (e.target.matches('[data-qtd]')) {
       e.target.value = window.Comanda.limitar(e.target.value);
-      atualizarCard(e.target.closest('.produto-card'));
-    }
-  });
-
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && aberto) {
-      var card = aberto;
-      alternar(card);
-      card.querySelector('.produto-card__toggle').focus();
+      atualizarDialog();
     }
   });
 
