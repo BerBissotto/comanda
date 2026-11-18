@@ -24,7 +24,28 @@
                 <a class="btn btn-primary" th:href="@{/produtos}">Escolher produtos</a>
             </div>
 
-            <ul class="itens" id="itens"></ul>
+            <!-- esqueleto até a comanda ser montada a partir do navegador -->
+            <ul class="itens" id="itens" aria-busy="true" aria-label="Itens da comanda">
+                <li class="item item--skeleton" aria-hidden="true">
+                    <div class="item__foto"></div>
+                    <div class="item__info"><span class="sk sk--line sk--w-80"></span><span class="sk sk--line sk--w-40"></span></div>
+                    <span class="sk item__remover"></span>
+                    <span class="sk item__qtd"></span>
+                    <span class="sk item__subtotal"></span>
+                </li>
+                <li class="item item--skeleton" aria-hidden="true">
+                    <div class="item__foto"></div>
+                    <div class="item__info"><span class="sk sk--line sk--w-60"></span><span class="sk sk--line sk--w-40"></span></div>
+                    <span class="sk item__remover"></span>
+                    <span class="sk item__qtd"></span>
+                    <span class="sk item__subtotal"></span>
+                </li>
+            </ul>
+
+            <div class="total-linha total-linha--skeleton" id="total-esqueleto" aria-hidden="true">
+                <span class="sk sk--title sk--w-40"></span>
+                <span class="sk sk--title sk--w-40"></span>
+            </div>
 
             <div class="total-linha" id="bloco-total" hidden>
                 <div>
@@ -46,13 +67,13 @@
                 </div>
 
                 <div class="field">
-                    <label class="label" for="telefone">Telefone</label>
+                    <label class="label" for="telefone">Telefone<span class="req" aria-hidden="true">*</span></label>
                     <input class="input" id="telefone" name="telefone" type="tel" inputmode="tel" maxlength="16"
                            placeholder="(00) 00000-0000" autocomplete="off" required>
                 </div>
 
                 <div class="field field--full combo">
-                    <label class="label" for="cliente">Cliente</label>
+                    <label class="label" for="cliente">Cliente<span class="req" aria-hidden="true">*</span></label>
                     <input class="input" id="cliente" name="cliente" type="text" maxlength="120"
                            placeholder="Digite o nome para buscar um cliente já cadastrado" required
                            role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="cliente-lista">
@@ -60,7 +81,7 @@
                 </div>
 
                 <div class="field field--full">
-                    <label class="label" for="endereco">Endereço</label>
+                    <label class="label" for="endereco">Endereço<span class="req" aria-hidden="true">*</span></label>
                     <input class="input" id="endereco" name="endereco" type="text" maxlength="255"
                            placeholder="Rua, número, bairro" required>
                 </div>
@@ -78,7 +99,7 @@
     <div class="acoes-final">
         <button type="button" class="btn btn-ghost btn-voltar" id="btn-voltar" th:data-href="@{/produtos}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
-            Voltar<span class="hide-sm">&nbsp;e editar itens</span>
+            <span>Voltar<span class="hide-sm">&nbsp;e editar itens</span></span>
         </button>
         <button type="button" class="btn btn-ghost" id="btn-pdf" disabled>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>

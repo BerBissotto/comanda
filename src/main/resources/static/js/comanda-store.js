@@ -83,7 +83,15 @@
   function atualizarMenu() {
     var t = window.Comanda.totais();
     document.querySelectorAll('[data-comanda-count]').forEach(function (el) {
-      el.textContent = t.unidades;
+      var novo = String(t.unidades);
+      var mudou = el.dataset.v !== undefined && el.dataset.v !== novo;   // 1ª leitura não anima
+      el.dataset.v = novo;
+      el.textContent = novo;
+      if (mudou && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        el.classList.remove('is-bump');
+        void el.offsetWidth;
+        el.classList.add('is-bump');
+      }
     });
   }
   document.addEventListener('comanda:change', atualizarMenu);
