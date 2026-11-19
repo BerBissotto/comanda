@@ -146,6 +146,8 @@
     dlg.classList.remove('is-visible', 'is-closing');
     dlg.style.removeProperty('--from');
     dlg.dataset.anim = animar ? 'on' : 'off';
+    // largura da barra de rolagem que vai sumir: compensada no CSS para a página não "pular"
+    raiz.style.setProperty('--sw', Math.max(0, window.innerWidth - raiz.clientWidth) + 'px');
     raiz.classList.add('dlg-open');
     dlg.showModal();
 
@@ -168,6 +170,7 @@
     dlg.classList.remove('is-visible', 'is-closing');
     if (dlg.open) dlg.close();
     raiz.classList.remove('dlg-open');
+    raiz.style.removeProperty('--sw');
     if (atual) {
       atual.classList.remove('is-selected');
       var gatilho = atual.querySelector('.produto-card__toggle');
@@ -201,7 +204,7 @@
   dlg.addEventListener('cancel', function (e) { e.preventDefault(); fechar(true); });
   // Clique no fundo desfocado (fora do painel)
   dlg.addEventListener('click', function (e) { if (e.target === dlg) fechar(false); });
-  dlg.addEventListener('close', function () { raiz.classList.remove('dlg-open'); });
+  dlg.addEventListener('close', function () { raiz.classList.remove('dlg-open'); raiz.style.removeProperty('--sw'); });
 
   /* ---- eventos da lista ---- */
   grid.addEventListener('click', function (e) {

@@ -62,27 +62,29 @@
   --focus-ring: 0 0 0 2px var(--ring-offset), 0 0 0 4px var(--accent);
 }
 
+/* Tema escuro em azul-marinho: tons tirados do painel azul da skill dwerp (#08314c, #064062, #064b74) */
 [data-theme="dark"] {
   color-scheme: dark;
-  --background: #000000;
-  --surface: #111827;
-  --surface-hover: #1e293b;
-  --field: #000000;
+  --background: #08314c;      /* fundo da página (canto escuro do degradê do dwerp) */
+  --surface: #064062;         /* cards, cabeçalho, barras */
+  --surface-hover: #064b74;
+  --field: #08314c;           /* campos ficam "afundados" em relação ao card */
   --text: #e5e7eb;
-  --text-soft: #9ca3af;
-  --text-placeholder: #6b7280;
-  --border: #475569;
-  --on-accent: #e5e7eb;
-  --ring-offset: #000000;
+  --text-soft: #d1d5db;
+  --text-placeholder: #9ca3af;
+  --border: #0b5a8a;
+  --border-strong: #0284c7;
+  --accent-strong: #0284c7;   /* botão principal precisa se destacar do azul do card */
+  --accent-strong-hover: #0369a1;
+  --on-accent: #ffffff;
+  --ring-offset: #08314c;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
 
-html {
-  -webkit-text-size-adjust: 100%;
-  scrollbar-gutter: stable;
-}
-html.dlg-open { overflow: hidden; }
+html { -webkit-text-size-adjust: 100%; }
+/* trava a rolagem com o diálogo aberto, compensando a barra para a página não "pular" (--sw vem do JS) */
+html.dlg-open { overflow: hidden; padding-right: var(--sw, 0); }
 
 body {
   margin: 0;
@@ -627,6 +629,7 @@ textarea.input { min-height: 96px; resize: vertical; line-height: 1.5; }
   opacity: 0;
   transition: opacity var(--t-slow) var(--ease-out);
 }
+[data-theme="dark"] .pdlg::backdrop { background: rgba(8, 49, 76, .72); }
 .pdlg.is-visible::backdrop { opacity: 1; }
 .pdlg.is-closing::backdrop { transition: opacity var(--t-base) var(--ease-in); }
 
