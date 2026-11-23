@@ -24,6 +24,8 @@ public class SecurityConfig {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/login", "/css/**", "/js/**", "/img/**", "/favicon.ico", "/error").permitAll()
+                        // Cadastro de usuários: só o perfil ADMIN (o controller confere de novo no banco)
+                        .requestMatchers("/usuarios", "/usuarios/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .formLogin(form -> form
                         .loginPage("/login")

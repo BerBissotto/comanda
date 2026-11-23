@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(${titulo})}"></head>
+<body>
+<header th:replace="~{fragments/layout :: topbar('usuarios')}"></header>
+
+<main class="container">
+    <div class="page-head">
+        <div>
+            <h1 class="page-title" th:text="${titulo}">Novo usuário</h1>
+            <p class="muted" th:text="${edicao}
+                ? 'Altere os dados ou a situação do usuário. A senha só muda se você preencher o campo.'
+                : 'Preencha todos os campos para liberar o acesso ao sistema.'">Preencha todos os campos.</p>
+        </div>
+    </div>
+
+    <div class="alert alert--erro" role="alert" th:if="${erro}">
+        <strong>Não foi possível salvar.</strong> <span th:text="${erro}">Mensagem de erro</span>
+    </div>
+
+    <form class="card" th:action="@{/usuarios/salvar}" th:object="${usuario}" method="post">
+        <input type="hidden" th:field="*{id}">
+
+        <div class="form-grid">
+            <div class="field">
+                <label class="label" for="nome">Nome da empresa<span class="req" aria-hidden="true">*</span></label>
+                <input class="input" id="nome" th:field="*{nome}" type="text" maxlength="120"
+                       placeholder="Ex.: Lanchonete Central" required th:autofocus="${!edicao}">
+            </div>
+
+            <div class="field">
+                <label class="label" for="email">E-mail<span class="req" aria-hidden="true">*</span></label>
+                <input class="input" id="email" th:field="*{email}" type="email" maxlength="160"
+                       autocomplete="off" placeholder="voce@empresa.com" required>
+            </div>
+
+            <div class="field">
+                <label class="label" for="senha">
+                    Senha<span class="req" aria-hidden="true" th:unless="${edicao}">*</span>
+                </label>
+                <div class="senha">
+                    <input class="input" id="senha" name="senha" type="password" minlength="8" maxlength="72"
+                           autocomplete="new-password" aria-describedby="senha-dica"
+                           th:placeholder="${edicao} ? 'Em branco mantém a atual' : 'Mínimo de 8 caracteres'"
+                           th:required="${!edicao}">
+                    <button type="button" class="btn-icon senha__ver" data-senha-ver aria-pressed="false"
+                            aria-label="Mostrar senha" hidden>
+                        <svg class="i-ver" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                        <svg class="i-ocultar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.2M6.6 6.6A17 17 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 4.4-1M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
+                    </button>
+                </div>
+                <p class="muted dica" id="senha-dica"
+                   th:text="${edicao} ? 'Deixe em branco para manter a senha atual.' : 'Use de 8 a 72 caracteres.'">Use de 8 a 72 caracteres.</p>
+            </div>
+
+            <div class="field">
+                <label class="label" for="ativo">Situação<span class="req" aria-hidden="true">*</span></label>
+                <select class="input" id="ativo" th:field="*{ativo}" aria-describedby="ativo-dica" required>
+                    <option value="true">Ativo</option>
+                    <option value="false">Inativo</option>
+                </select>
+                <p class="muted dica" id="ativo-dica">Usuários inativos não conseguem entrar no sistema.</p>
+            </div>
+        </div>
+
+        <div class="form-acoes">
+            <a class="btn btn-ghost" th:href="@{/usuarios}">Cancelar</a>
+            <button class="btn btn-primary" type="submit">Salvar usuário</button>
+        </div>
+    </form>
+</main>
+
+<script th:src="@{/js/usuario-form.js}" defer></script>
+</body>
+</html>

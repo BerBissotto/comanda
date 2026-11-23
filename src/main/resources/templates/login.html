@@ -16,7 +16,7 @@
 
         <div>
             <div class="alert alert--erro" role="alert" th:if="${param.error}">
-                <strong>E-mail ou senha incorretos.</strong> Confira os dados e tente novamente.
+                <strong>Não foi possível entrar.</strong> Confira o e-mail e a senha. Se os dados estiverem certos, o acesso pode estar inativo: fale com o administrador.
             </div>
             <div class="alert alert--erro" role="alert" th:if="${param.bloqueado}">
                 <strong>Muitas tentativas de login.</strong> Por segurança, o acesso foi bloqueado temporariamente. Tente novamente em alguns minutos.

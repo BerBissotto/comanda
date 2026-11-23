@@ -16,11 +16,13 @@
     <script th:src="@{/js/ui.js}" defer></script>
 </head>
 <body>
-<header class="app-header" th:fragment="topbar(ativo)">
+<header class="app-header" th:classappend="${ehAdmin} ? 'app-header--admin'" th:fragment="topbar(ativo)">
     <div class="app-header__inner">
         <a class="brand" th:href="@{/produtos}">Comanda</a>
 
         <a class="nav-link" th:href="@{/produtos}" th:classappend="${ativo == 'produtos'} ? 'is-active'">Produtos</a>
+        <!-- só o perfil ADMIN enxerga a opção (ehAdmin vem do NavegacaoAdvice) -->
+        <a class="nav-link" th:if="${ehAdmin}" th:href="@{/usuarios}" th:classappend="${ativo == 'usuarios'} ? 'is-active'">Usuários</a>
         <a class="nav-link" th:href="@{/comanda}" th:classappend="${ativo == 'comanda'} ? 'is-active'">
             Comanda <span class="badge badge--accent" data-comanda-count aria-label="itens na comanda">0</span>
         </a>
