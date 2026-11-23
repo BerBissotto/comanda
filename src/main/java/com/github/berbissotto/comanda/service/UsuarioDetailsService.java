@@ -4,7 +4,6 @@ import com.github.berbissotto.comanda.model.Usuario;
 import com.github.berbissotto.comanda.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.LockedException;
-import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -27,9 +26,7 @@ public class UsuarioDetailsService implements UserDetailsService {
         }
         Usuario usuario = usuarioRepository.findByEmailIgnoreCase(email == null ? "" : email.trim())
                 .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
-        return User.withUsername(usuario.getEmail())
-                .password(usuario.getSenha())
-                .roles("USER")
-                .build();
+        // Perfil (ADMIN/USER) e situação (ativo/inativo) vêm do banco; inativo não consegue entrar
+        return new UsuarioLogado(usuario);
     }
 }

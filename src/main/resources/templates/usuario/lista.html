@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Usuários')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: topbar('usuarios')}"></header>
+
+<main class="container">
+    <div class="page-head">
+        <div>
+            <h1 class="page-title">Usuários</h1>
+            <p class="muted">Quem pode entrar no sistema. Selecione um usuário para alterar os dados ou a situação.</p>
+        </div>
+        <a class="btn btn-ghost" th:href="@{/usuarios/form}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            Adicionar usuário
+        </a>
+    </div>
+
+    <div class="alert alert--ok" role="status" th:if="${sucesso}" th:text="${sucesso}">Usuário cadastrado.</div>
+
+    <div class="empty" th:if="${usuarios.empty}">
+        <p>Nenhum usuário cadastrado ainda.</p>
+        <a class="btn btn-primary" th:href="@{/usuarios/form}">Adicionar o primeiro usuário</a>
+    </div>
+
+    <!-- cada linha é um link: abre o cadastro do usuário para alterar -->
+    <ul class="usuarios" role="list" th:unless="${usuarios.empty}">
+        <li th:each="u : ${usuarios}">
+            <a class="usuario" th:href="@{/usuarios/{id}/editar(id=${u.id})}">
+                <span class="usuario__nome" th:text="${u.nome}">Nome da empresa</span>
+                <span class="usuario__email muted" th:text="${u.email}">email@empresa.com</span>
+                <span class="usuario__perfil muted"
+                      th:text="${u.role.name() == 'ADMIN'} ? 'Administrador' : 'Usuário'">Usuário</span>
+                <span class="badge" th:classappend="${u.ativo} ? 'badge--accent' : 'badge--inativo'"
+                      th:text="${u.ativo} ? 'Ativo' : 'Inativo'">Ativo</span>
+                <svg class="usuario__seta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+            </a>
+        </li>
+    </ul>
+
+    <div class="pagina-fim">
+        <a class="btn btn-ghost" th:href="@{/produtos}">Voltar para a página inicial</a>
+    </div>
+</main>
+</body>
+</html>
