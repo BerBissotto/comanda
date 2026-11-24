@@ -10,8 +10,12 @@
 --   psql -U <usuario> -d Comanda -f sql/admin-usuario.sql
 --   ou abra este arquivo no pgAdmin (Query Tool) conectado ao banco Comanda e execute tudo.
 --
--- Pode ser executado mais de uma vez sem causar erro. Se o banco for novo, suba a
--- aplicação uma vez antes (ela cria a tabela "usuario") e depois rode o script.
+-- Pode ser executado mais de uma vez sem causar erro. Se o banco for novo, rode antes
+-- sql/01-preparar-banco.sql e suba a aplicação uma vez (ela cria a tabela "usuario"); depois rode
+-- este script.
+--
+-- Cada empresa tem o seu próprio espaço de dados (schema empresa_<id>). Para usuários criados
+-- por aqui, a aplicação cria esse espaço automaticamente no primeiro login (ou ao subir).
 --
 -- Resultado: existe o usuário admin@comanda.local com ROLE ADMIN e ativo.
 --   * Se o e-mail ainda não existia, é criado com a senha inicial entregue junto com este

@@ -2,6 +2,7 @@ package com.github.berbissotto.comanda.service;
 
 import com.github.berbissotto.comanda.model.Role;
 import com.github.berbissotto.comanda.model.Usuario;
+import com.github.berbissotto.comanda.tenant.TenantContext;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
@@ -27,6 +28,11 @@ public class UsuarioLogado extends User {
 
     public Long getId() {
         return id;
+    }
+
+    /** Schema (e papel) do banco onde ficam os produtos, clientes e comandas desta empresa. */
+    public String schema() {
+        return TenantContext.schemaDe(id);
     }
 
     private static List<GrantedAuthority> autoridades(Role role) {

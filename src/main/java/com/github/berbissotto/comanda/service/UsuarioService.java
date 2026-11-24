@@ -4,6 +4,7 @@ import com.github.berbissotto.comanda.dto.UsuarioForm;
 import com.github.berbissotto.comanda.model.Role;
 import com.github.berbissotto.comanda.model.Usuario;
 import com.github.berbissotto.comanda.repository.UsuarioRepository;
+import com.github.berbissotto.comanda.tenant.TenantProvisioner;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -23,10 +24,13 @@ public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
+    private final TenantProvisioner provisionador;
 
-    public UsuarioService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder) {
+    public UsuarioService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder,
+                          TenantProvisioner provisionador) {
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
+        this.provisionador = provisionador;
     }
 
     @Transactional(readOnly = true)
@@ -115,6 +119,15 @@ public class UsuarioService {
         }
 
         usuarioRepository.save(usuario);
+        if (novo) {
+            // Cada empresa tem o seu próprio espaço de dados. Mesma transação do cadastro: se a
+            // criação falhar, o usuário também não é gravado.
+            try {
+                provisionador.provisionar(usuario.getId());
+            } catch (IllegalStateException erro) {
+                throw new IllegalArgumentException(erro.getMessage(), erro);
+            }
+        }
         return usuario;
     }
 
