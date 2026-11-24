@@ -26,8 +26,8 @@ public class Usuario {
     @Column(nullable = false)
     private String senha;
 
-    // Os valores padrão no banco deixam o ddl-auto=update adicionar as colunas numa tabela que já
-    // tem usuários: quem já existia passa a ser USER e ativo (o ADMIN é definido por SQL).
+    // Os valores padrão no banco (db/central/V1__usuario.sql) permitem adicionar as colunas numa
+    // tabela que já tem usuários: quem já existia passa a ser USER e ativo (o ADMIN é definido por SQL).
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @ColumnDefault("'USER'")

@@ -1,6 +1,7 @@
 package com.github.berbissotto.comanda.config;
 
 import com.github.berbissotto.comanda.service.UsuarioDetailsService;
+import com.github.berbissotto.comanda.tenant.TenantFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -11,6 +12,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.security.web.header.writers.StaticHeadersWriter;
@@ -27,6 +29,8 @@ public class SecurityConfig {
                         // Cadastro de usuários: só o perfil ADMIN (o controller confere de novo no banco)
                         .requestMatchers("/usuarios", "/usuarios/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
+                // Define a empresa (banco de dados) da requisição a partir do usuário logado
+                .addFilterAfter(new TenantFilter(), AuthorizationFilter.class)
                 .formLogin(form -> form
                         .loginPage("/login")
                         .defaultSuccessUrl("/produtos", true)

@@ -4,6 +4,7 @@ import com.github.berbissotto.comanda.dto.UsuarioForm;
 import com.github.berbissotto.comanda.model.Role;
 import com.github.berbissotto.comanda.model.Usuario;
 import com.github.berbissotto.comanda.repository.UsuarioRepository;
+import com.github.berbissotto.comanda.tenant.TenantProvisioner;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
@@ -26,13 +27,15 @@ class UsuarioServiceTest {
 
     private UsuarioRepository repositorio;
     private PasswordEncoder codificador;
+    private TenantProvisioner provisionador;
     private UsuarioService servico;
 
     @BeforeEach
     void preparar() {
         repositorio = mock(UsuarioRepository.class);
         codificador = new BCryptPasswordEncoder();
-        servico = new UsuarioService(repositorio, codificador);
+        provisionador = mock(TenantProvisioner.class);
+        servico = new UsuarioService(repositorio, codificador, provisionador);
     }
 
     private static UsuarioForm form(Long id, String nome, String email, String senha, boolean ativo) {
@@ -221,5 +224,36 @@ class UsuarioServiceTest {
         assertEquals(1L, admin.getId());
         assertTrue(admin.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority())));
         assertTrue(inativo.getAuthorities().stream().anyMatch(a -> "ROLE_USER".equals(a.getAuthority())));
+    }
+
+    @Test
+    void usuarioNovoGanhaEmpresaNaMesmaTransacao() {
+        when(repositorio.save(org.mockito.ArgumentMatchers.any(Usuario.class))).thenAnswer(chamada -> {
+            Usuario gravado = chamada.getArgument(0);
+            gravado.setId(42L);
+            return gravado;
+        });
+
+        servico.salvar(form(null, "Loja", "loja@x.com", "senha-forte-1", true), 1L);
+
+        verify(provisionador).provisionar(42L);
+    }
+
+    @Test
+    void edicaoNaoCriaEmpresa() {
+        when(repositorio.findById(5L)).thenReturn(Optional.of(usuario(5L, "a@x.com", Role.USER, true)));
+
+        servico.salvar(form(5L, "Novo nome", "a@x.com", "", true), 1L);
+
+        verify(provisionador, never()).provisionar(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void falhaAoCriarEmpresaViraMensagemParaQuemCadastra() {
+        org.mockito.Mockito.doThrow(new IllegalStateException("Não foi possível criar o espaço de dados"))
+                .when(provisionador).provisionar(org.mockito.ArgumentMatchers.any());
+
+        assertEquals("Não foi possível criar o espaço de dados",
+                mensagem(() -> servico.salvar(form(null, "Loja", "loja@x.com", "senha-forte-1", true), 1L)));
     }
 }
